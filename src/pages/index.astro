@@ -1,11 +1,99 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
+// HOME：背景イラスト＋エフェクト（今は仮のグラデーション）と NEWS の最新3件
+// 初期ロード演出は入れない
+import BaseLayout from '../layouts/BaseLayout.astro';
+import NewsList from '../components/NewsList.astro';
+import { getProfile } from '../lib/site';
+import { getSortedNews } from '../lib/news';
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+const profile = await getProfile();
+const latestNews = (await getSortedNews()).slice(0, 3);
 ---
 
-<Layout>
-	<Welcome />
-</Layout>
+<BaseLayout transparentHeader>
+	<section class="hero">
+		{
+			/*
+			 * TODO: 絵師に依頼したイラストを astro:assets の <Image>（画面サイズに合わせた大きさ）で背景に表示し、
+			 *       CSS 中心のエフェクト（ゆっくりしたズーム・光の粒子・グラデーション）を重ねる。
+			 *       スマホでは粒子を減らし、prefers-reduced-motion では静止画のみにする。
+			 * TODO: /api/live を読み、配信中なら「LIVE NOW」バッジと画面の縁が光る演出を表示する。
+			 */
+		}
+		<div class="hero-bg" aria-hidden="true"></div>
+
+		<div class="hero-content">
+			<h1 class="hero-title">{profile.name}</h1>
+		</div>
+
+		{/* 文字の下に半透明の帯を敷いて読みやすくする */}
+		<div class="latest-band">
+			<section class="latest container" aria-labelledby="latest-heading">
+				<h2 id="latest-heading" class="latest-heading">NEWS</h2>
+				<NewsList posts={latestNews} />
+				<a class="more" href="/news/">一覧を見る</a>
+			</section>
+		</div>
+	</section>
+</BaseLayout>
+
+<style>
+	.hero {
+		position: relative;
+		min-height: 100svh;
+		display: flex;
+		flex-direction: column;
+		color: #fff;
+		overflow: hidden;
+	}
+
+	/* 仮の背景（依頼イラストの代わり） */
+	.hero-bg {
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(135deg, #24324a 0%, #4a5f8c 50%, #8c7aa8 100%);
+	}
+
+	.hero-content,
+	.latest-band {
+		position: relative;
+	}
+
+	.hero-content {
+		flex: 1;
+		display: grid;
+		place-items: center;
+		padding: calc(var(--header-height) + 24px) var(--gutter) 24px;
+		text-align: center;
+	}
+
+	.hero-title {
+		margin: 0;
+		font-size: clamp(2rem, 7vw, 4.5rem);
+		letter-spacing: 0.12em;
+		text-shadow: 0 2px 12px rgb(0 0 0 / 0.35);
+	}
+
+	.latest-band {
+		background: rgb(0 0 0 / 0.45);
+		backdrop-filter: blur(4px);
+	}
+
+	.latest {
+		--line: rgb(255 255 255 / 0.3);
+		padding-block: 24px 32px;
+	}
+
+	.latest-heading {
+		margin: 0 0 8px;
+		font-size: 1rem;
+		letter-spacing: 0.2em;
+	}
+
+	.more {
+		display: inline-block;
+		margin-top: 16px;
+		color: inherit;
+		font-size: 0.875rem;
+	}
+</style>

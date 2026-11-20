@@ -1,0 +1,79 @@
+---
+// NEWS 一覧：新しい順に1行ずつ並べ、カテゴリで絞り込む（記事が増えたらページ送り・RSS を追加する）
+// 読みやすさを最優先し、装飾やアニメーションは入れない
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import NewsList from '../../components/NewsList.astro';
+import { getSortedNews } from '../../lib/news';
+import { NEWS_CATEGORIES } from '../../content.config';
+
+const posts = await getSortedNews();
+// 記事があるカテゴリだけ絞り込みボタンを出す
+const categories = NEWS_CATEGORIES.filter((c) => posts.some((p) => p.data.category === c));
+---
+
+<BaseLayout title="NEWS">
+	<div class="page container">
+		<h1 class="page-title">NEWS</h1>
+
+		{
+			categories.length > 1 && (
+				<div class="filter" role="group" aria-label="カテゴリで絞り込む" data-news-filter>
+					<button type="button" data-filter="" aria-pressed="true">すべて</button>
+					{categories.map((c) => (
+						<button type="button" data-filter={c} aria-pressed="false">
+							{c}
+						</button>
+					))}
+				</div>
+			)
+		}
+
+		{posts.length > 0 ? <NewsList posts={posts} /> : <p>お知らせはまだありません。</p>}
+	</div>
+</BaseLayout>
+
+<script>
+	// カテゴリ絞り込み（JS が動かない環境では全件表示のまま）
+	document.addEventListener('astro:page-load', () => {
+		const filter = document.querySelector('[data-news-filter]');
+		if (!filter) return;
+		const buttons = filter.querySelectorAll<HTMLButtonElement>('[data-filter]');
+		const items = document.querySelectorAll<HTMLElement>('.news-list li[data-category]');
+
+		buttons.forEach((button) => {
+			button.addEventListener('click', () => {
+				const category = button.dataset.filter;
+				buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+				items.forEach((item) => {
+					item.hidden = Boolean(category) && item.dataset.category !== category;
+				});
+			});
+		});
+	});
+</script>
+
+<style>
+	.filter {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-bottom: 24px;
+	}
+
+	.filter button {
+		padding: 4px 16px;
+		border: 1px solid var(--color-line);
+		border-radius: 999px;
+		background: var(--color-surface);
+		color: inherit;
+		font: inherit;
+		font-size: 0.875rem;
+		cursor: pointer;
+	}
+
+	.filter button[aria-pressed='true'] {
+		border-color: var(--color-text);
+		background: var(--color-text);
+		color: var(--color-bg);
+	}
+</style>

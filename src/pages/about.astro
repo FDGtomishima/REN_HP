@@ -1,0 +1,410 @@
+---
+// ABOUT：src/data/profile.yaml から生成するプロフィール
+// 並び：立ち絵 → 衣装選択 → 紹介文 → 基本情報 → SNS → タグ → よくやる配信
+import { Image } from 'astro:assets';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SnsLinks from '../components/SnsLinks.astro';
+import { getProfile } from '../lib/site';
+import { getAsset } from '../lib/assets';
+
+const profile = await getProfile();
+
+// 衣装はお披露目日の新しい順に並べ、最新の衣装を初期表示にする
+const outfits = [...profile.outfits].sort((a, b) => b.released.localeCompare(a.released));
+
+const [bMonth, bDay] = profile.birthday.split('-').map(Number);
+const formatYmd = (s: string) => s.replaceAll('-', '.');
+
+const tags = [
+	{ label: '配信タグ', value: profile.tags.stream, searchable: true },
+	{ label: 'ファンアートタグ', value: profile.tags.fanart, searchable: true },
+	{ label: 'ファンネーム', value: profile.tags.fan_name, searchable: false },
+];
+const xSearchUrl = (tag: string) => `https://x.com/search?q=${encodeURIComponent(tag)}`;
+---
+
+<BaseLayout title="ABOUT">
+	<div class="page container">
+		<h1 class="page-title">ABOUT</h1>
+
+		<div class="profile">
+			<!-- 左（スマホでは上）：立ち絵と衣装選択 -->
+			<div class="visual" data-outfits>
+				{
+					outfits.map((outfit, oi) => (
+						<div class="outfit" data-outfit={outfit.id} hidden={oi !== 0}>
+							<div class="stage">
+								{outfit.variants.map((v, vi) => (
+									<Image
+										src={getAsset(v.image)}
+										alt={`${profile.name}（${outfit.name}・${v.label}）`}
+										widths={[320, 480, 640]}
+										sizes="(max-width: 767px) 90vw, 400px"
+										data-variant={vi}
+										hidden={vi !== 0}
+										loading={oi === 0 && vi === 0 ? 'eager' : 'lazy'}
+									/>
+								))}
+							</div>
+
+							{outfit.variants.length > 1 && (
+								<div class="variants" role="group" aria-label="差分の切り替え">
+									{outfit.variants.map((v, vi) => (
+										<button type="button" data-variant-button={vi} aria-pressed={vi === 0 ? 'true' : 'false'}>
+											{v.label}
+										</button>
+									))}
+								</div>
+							)}
+
+							<p class="outfit-meta">
+								<span class="outfit-name">{outfit.name}</span>
+								<span>お披露目：<time datetime={outfit.released}>{formatYmd(outfit.released)}</time></span>
+							</p>
+							<p class="artist">
+								イラスト：
+								{outfit.artist.url ? (
+									<a href={outfit.artist.url} target="_blank" rel="noopener noreferrer">
+										{outfit.artist.name}
+									</a>
+								) : (
+									outfit.artist.name
+								)}
+							</p>
+						</div>
+					))
+				}
+
+				{
+					outfits.length > 1 && (
+						<div class="outfit-tabs" role="tablist" aria-label="衣装の選択">
+							{outfits.map((outfit, oi) => (
+								<button type="button" role="tab" data-outfit-tab={outfit.id} aria-selected={oi === 0 ? 'true' : 'false'}>
+									{outfit.id}
+								</button>
+							))}
+						</div>
+					)
+				}
+			</div>
+
+			<!-- 右（スマホでは下）：情報 -->
+			<div class="info">
+				<h2 class="name">{profile.name}</h2>
+
+				<p class="intro">{profile.intro}</p>
+				<p class="official">
+					<a href={profile.official_profile} target="_blank" rel="noopener noreferrer">公式プロフィールはこちら</a>
+				</p>
+
+				<h3>基本情報</h3>
+				<dl class="basic">
+					<div>
+						<dt>誕生日</dt>
+						<dd>{bMonth}月{bDay}日</dd>
+					</div>
+					<div>
+						<dt>デビュー日</dt>
+						<dd>
+							<time datetime={profile.debut}>{formatYmd(profile.debut)}</time>
+							<span class="days" data-days-since={profile.debut}></span>
+						</dd>
+					</div>
+					{
+						profile.anniversaries.map((a) => (
+							<div>
+								<dt>{a.label}</dt>
+								<dd>
+									<time datetime={a.date}>{formatYmd(a.date)}</time>
+								</dd>
+							</div>
+						))
+					}
+				</dl>
+
+				<h3>SNS</h3>
+				<SnsLinks items={profile.sns} showId />
+
+				<h3>タグ</h3>
+				<dl class="tags">
+					{
+						tags.map((t) => (
+							<div>
+								<dt>{t.label}</dt>
+								<dd>
+									{t.searchable ? (
+										<a href={xSearchUrl(t.value)} target="_blank" rel="noopener noreferrer">
+											{t.value}
+										</a>
+									) : (
+										<span>{t.value}</span>
+									)}
+									<button type="button" class="copy" data-copy={t.value}>
+										コピー
+									</button>
+								</dd>
+							</div>
+						))
+					}
+				</dl>
+			</div>
+		</div>
+
+		{
+			profile.frequent_streams.length > 0 && (
+				<section class="streams" aria-labelledby="streams-heading">
+					<h3 id="streams-heading">よくやる配信</h3>
+					<ul class="stream-cards">
+						{profile.frequent_streams.map((s) => (
+							<li>
+								<h4>{s.title}</h4>
+								<p>{s.description}</p>
+								{s.example && (
+									<a href={s.example} target="_blank" rel="noopener noreferrer">
+										代表的な配信を見る
+									</a>
+								)}
+							</li>
+						))}
+					</ul>
+				</section>
+			)
+		}
+	</div>
+</BaseLayout>
+
+<script>
+	// 衣装・差分の切り替え、デビューからの日数、タグのコピー
+	// View Transitions でページが差し替わるため、astro:page-load で毎回登録する
+	document.addEventListener('astro:page-load', () => {
+		const root = document.querySelector<HTMLElement>('[data-outfits]');
+		if (!root) return;
+
+		// 衣装タブ
+		const tabs = root.querySelectorAll<HTMLButtonElement>('[data-outfit-tab]');
+		tabs.forEach((tab) => {
+			tab.addEventListener('click', () => {
+				const id = tab.dataset.outfitTab;
+				tabs.forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+				root.querySelectorAll<HTMLElement>('[data-outfit]').forEach((o) => {
+					o.hidden = o.dataset.outfit !== id;
+				});
+			});
+		});
+
+		// 差分ボタン（衣装ごと）
+		root.querySelectorAll<HTMLElement>('[data-outfit]').forEach((outfit) => {
+			const buttons = outfit.querySelectorAll<HTMLButtonElement>('[data-variant-button]');
+			buttons.forEach((button) => {
+				button.addEventListener('click', () => {
+					const index = button.dataset.variantButton;
+					buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+					outfit.querySelectorAll<HTMLElement>('[data-variant]').forEach((img) => {
+						img.hidden = img.dataset.variant !== index;
+					});
+				});
+			});
+		});
+
+		// デビューからの日数（閲覧時に計算）
+		document.querySelectorAll<HTMLElement>('[data-days-since]').forEach((el) => {
+			const [y, m, d] = el.dataset.daysSince!.split('-').map(Number);
+			const start = new Date(y, m - 1, d);
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			const days = Math.round((today.getTime() - start.getTime()) / 86_400_000);
+			if (days >= 0) el.textContent = `（デビューから ${days.toLocaleString()} 日）`;
+		});
+
+		// タグのコピー
+		document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => {
+			button.addEventListener('click', async () => {
+				try {
+					await navigator.clipboard.writeText(button.dataset.copy!);
+					button.textContent = 'コピーしました';
+				} catch {
+					button.textContent = 'コピーできませんでした';
+				}
+				setTimeout(() => (button.textContent = 'コピー'), 2000);
+			});
+		});
+	});
+</script>
+
+<style>
+	/* PC：左に立ち絵・右に情報 */
+	.profile {
+		display: grid;
+		grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+		gap: 48px;
+		align-items: start;
+	}
+
+	.stage {
+		aspect-ratio: 2 / 3;
+		background: var(--color-line);
+		border-radius: 8px;
+		overflow: hidden;
+	}
+
+	.stage :global(img) {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+
+	.stage :global(img[hidden]) {
+		display: none;
+	}
+
+	.variants,
+	.outfit-tabs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.variants {
+		margin-top: 12px;
+	}
+
+	.outfit-tabs {
+		margin-top: 16px;
+	}
+
+	.variants button,
+	.outfit-tabs button,
+	.copy {
+		padding: 4px 14px;
+		border: 1px solid var(--color-line);
+		border-radius: 999px;
+		background: var(--color-surface);
+		color: inherit;
+		font: inherit;
+		font-size: 0.875rem;
+		cursor: pointer;
+	}
+
+	.variants button[aria-pressed='true'],
+	.outfit-tabs button[aria-selected='true'] {
+		border-color: var(--color-accent);
+		background: var(--color-accent);
+		color: #fff;
+	}
+
+	.outfit-meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 16px;
+		margin: 12px 0 0;
+		font-size: 0.875rem;
+	}
+
+	.outfit-name {
+		font-weight: 700;
+	}
+
+	.artist {
+		margin: 4px 0 0;
+		color: var(--color-muted);
+		font-size: 0.8125rem;
+	}
+
+	.name {
+		margin: 0 0 16px;
+		font-size: 2rem;
+		letter-spacing: 0.08em;
+	}
+
+	.intro {
+		white-space: pre-line;
+	}
+
+	h3 {
+		margin: 32px 0 8px;
+		font-size: 1rem;
+	}
+
+	.basic,
+	.tags {
+		margin: 0;
+	}
+
+	.basic div,
+	.tags div {
+		display: grid;
+		grid-template-columns: 9em 1fr;
+		gap: 8px;
+		padding-block: 6px;
+		border-bottom: 1px solid var(--color-line);
+	}
+
+	dt {
+		color: var(--color-muted);
+	}
+
+	dd {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 12px;
+		margin: 0;
+	}
+
+	.days {
+		color: var(--color-muted);
+		font-size: 0.875rem;
+	}
+
+	.copy {
+		padding: 0 10px;
+		font-size: 0.75rem;
+	}
+
+	.streams {
+		margin-top: 56px;
+	}
+
+	.stream-cards {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+		gap: 16px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.stream-cards li {
+		padding: 20px;
+		border: 1px solid var(--color-line);
+		border-radius: 8px;
+		background: var(--color-surface);
+	}
+
+	.stream-cards h4 {
+		margin: 0 0 4px;
+	}
+
+	.stream-cards p {
+		margin: 0 0 8px;
+		font-size: 0.9375rem;
+	}
+
+	/* スマホ：縦並び */
+	@media (max-width: 767px) {
+		.profile {
+			grid-template-columns: 1fr;
+			gap: 32px;
+		}
+
+		.visual {
+			max-width: 360px;
+		}
+
+		.basic div,
+		.tags div {
+			grid-template-columns: 1fr;
+			gap: 0;
+		}
+	}
+</style>

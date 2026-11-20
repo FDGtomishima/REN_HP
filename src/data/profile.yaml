@@ -1,0 +1,41 @@
+# ライバーのプロフィール（ABOUT・HOME の配信中判定・HISTORY の周年計算で使う）
+# すべてダミーデータ。紹介文は自作の文章にし、公式の紹介文は引用しない
+name: ○○ ○○
+birthday: "03-14"
+debut: "2024-04-01"
+anniversaries:
+  - { label: 初配信, date: "2024-04-01" }
+  - { label: 登録者10万人, date: "2025-02-11" }
+intro: |
+  ここに自分で書いた紹介文が入ります。（ダミー）
+  改行もそのまま反映されます。
+official_profile: https://example.com/talents/xxxx
+outfits:
+  - id: 1st
+    name: 初期衣装
+    released: "2024-04-01"
+    artist: { name: ○○（絵師）, url: https://x.com/zzzz }
+    variants:
+      - { label: 通常, image: outfits/1st-default.svg }
+      - { label: 笑顔, image: outfits/1st-smile.svg }
+  - id: 2nd
+    name: 夏衣装
+    released: "2025-07-20"
+    artist: { name: △△（絵師）, url: https://x.com/wwww }
+    variants:
+      - { label: 通常, image: outfits/2nd-default.svg }
+sns:
+  - { service: youtube, id: "@xxxx", url: https://www.youtube.com/@xxxx }
+  - { service: twitch, id: xxxx, url: https://www.twitch.tv/xxxx }
+  - { service: x, id: "@xxxx", url: https://x.com/xxxx }
+live_check:
+  youtube_channel_id: UCxxxxxxxxxxxx
+  twitch_login: xxxx
+tags:
+  stream: "#○○配信"
+  fanart: "#○○アート"
+  fan_name: ○○さん
+frequent_streams:
+  - { title: 雑談, description: リスナーとのんびり話す配信です。（ダミー）, example: https://www.youtube.com/watch?v=xxxx }
+  - { title: 歌枠, description: リクエスト曲などを歌う配信です。（ダミー）, example: https://www.youtube.com/watch?v=yyyy }
+  - { title: ゲーム, description: FPS を中心にいろいろなゲームを遊ぶ配信です。（ダミー）, example: https://www.youtube.com/watch?v=zzzz }

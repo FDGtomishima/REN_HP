@@ -1,0 +1,57 @@
+---
+// 全ページ共通のレイアウト（head・OGP・ヘッダー・フッター・ページ切り替え演出）
+import { ClientRouter } from 'astro:transitions';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { getSite } from '../lib/site';
+import '../styles/global.css';
+
+interface Props {
+	/** ページ名（未指定ならサイト名のみ） */
+	title?: string;
+	/** meta description / OGP の説明文（未指定なら site.yaml の説明文） */
+	description?: string;
+	/** OGP の種類（記事ページは article） */
+	ogType?: 'website' | 'article';
+	/** HOME のように、ヘッダーを背景の上に透過表示するか */
+	transparentHeader?: boolean;
+}
+
+const { title, description, ogType = 'website', transparentHeader = false } = Astro.props;
+const site = await getSite();
+const pageTitle = title ? `${title} | ${site.name}` : site.name;
+const pageDescription = description ?? site.description;
+// 公開URL（astro.config.mjs の site）が決まったら og:url を出力する
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
+---
+
+<!doctype html>
+<html lang="ja">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{pageTitle}</title>
+		<meta name="description" content={pageDescription} />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" />
+		<meta name="generator" content={Astro.generator} />
+
+		{/* SNS でシェアされたときの表示（OGP）。TODO: og:image を用意する */}
+		<meta property="og:site_name" content={site.name} />
+		<meta property="og:title" content={title ?? site.name} />
+		<meta property="og:description" content={pageDescription} />
+		<meta property="og:type" content={ogType} />
+		{canonical && <meta property="og:url" content={canonical} />}
+		{canonical && <link rel="canonical" href={canonical} />}
+		<meta name="twitter:card" content="summary" />
+
+		<ClientRouter />
+	</head>
+	<body>
+		<Header siteName={site.shortName} transparent={transparentHeader} />
+		<main>
+			<slot />
+		</main>
+		<Footer />
+	</body>
+</html>

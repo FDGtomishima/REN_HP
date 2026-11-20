@@ -1,0 +1,60 @@
+---
+// SNS へのリンク一覧（埋め込みウィジェットは使わず、通常のリンクにする）
+// TODO: 各社のブランドガイドラインに沿った公式アイコンを用意して、ラベルの前に表示する
+interface Props {
+	items: { service: string; id: string; url: string }[];
+	/** ユーザーIDも表示するか（ABOUT では表示、フッターでは非表示） */
+	showId?: boolean;
+}
+
+const { items, showId = false } = Astro.props;
+
+const serviceLabels: Record<string, string> = {
+	youtube: 'YouTube',
+	twitch: 'Twitch',
+	x: 'X',
+	tiktok: 'TikTok',
+	instagram: 'Instagram',
+	other: 'Link',
+};
+---
+
+<ul class="sns-links">
+	{
+		items.map((item) => (
+			<li>
+				<a href={item.url} target="_blank" rel="noopener noreferrer">
+					<span class="service">{serviceLabels[item.service] ?? item.service}</span>
+					{showId && <span class="id">{item.id}</span>}
+				</a>
+			</li>
+		))
+	}
+</ul>
+
+<style>
+	.sns-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px 20px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	a {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 8px;
+		color: inherit;
+	}
+
+	.service {
+		font-weight: 700;
+	}
+
+	.id {
+		font-size: 0.875em;
+		color: var(--color-muted);
+	}
+</style>

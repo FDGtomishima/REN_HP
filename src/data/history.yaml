@@ -1,0 +1,47 @@
+# 年表（節目の配信とビッグイベントのみ）。周年の区切りは profile.yaml の debut から自動計算する
+# achievement には achievements.yaml の id を書く（実績でなければ null）
+- date: "2024-04-01"
+  title: 初配信
+  text: デビュー配信。（ダミー）
+  embeds:
+    - { platform: youtube, id: xxxxxxxxxxx }
+  achievement: null
+- date: "2024-08-15"
+  title: 初の歌枠
+  text: 初めての歌枠配信。（ダミー）
+  embeds: []
+  achievement: null
+- date: "2025-04-01"
+  title: 1周年記念配信
+  text: 1周年を記念した配信。（ダミー）
+  embeds:
+    - { platform: youtube, id: yyyyyyyyyyy }
+  achievement: null
+- date: "2025-08-10"
+  title: ○○杯 2025 Summer で優勝
+  text: チーム戦の大会で優勝。（ダミー）
+  embeds:
+    - { platform: twitch, id: "1234567890" }
+  achievement: cup-2025-summer
+- date: "2025-06-01"
+  title: 3D お披露目
+  text: 3D モデルのお披露目配信。（ダミー）
+  embeds:
+    - { platform: youtube, id: zzzzzzzzzzz }
+  achievement: null
+- date: "2025-10-12"
+  title: 耐久配信
+  text: 12 時間の耐久配信。（ダミー）
+  embeds: []
+  achievement: null
+- date: "2026-01-01"
+  title: 新年の歌枠
+  text: 新年最初の歌枠。（ダミー）
+  embeds:
+    - { platform: twitch, id: SomeClipSlug-abc123 }
+  achievement: null
+- date: "2026-05-05"
+  title: 2周年記念ライブ
+  text: 2周年を記念したライブ配信。（ダミー）
+  embeds: []
+  achievement: null

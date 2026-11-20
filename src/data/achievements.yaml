@@ -1,0 +1,24 @@
+# 実績（id は URL の /achievements/#ID に使うので、英数字とハイフンで一意に付ける）
+- id: cup-2025-summer
+  title: ○○杯 2025 Summer
+  datetime: "2025-08-10T20:00"
+  category: 大会
+  result: 優勝
+  organizers:
+    - { name: ○○運営, url: https://x.com/xxxx }
+  team:
+    - { name: △△, url: https://x.com/yyyy }
+    - { name: □□, url: https://x.com/zzzz }
+  streams:
+    - { label: 本人視点, url: https://www.youtube.com/watch?v=xxxx }
+    - { label: 公式配信, url: https://www.youtube.com/watch?v=yyyy }
+  description: チーム戦の大会で優勝しました。（ダミー）
+- id: collab-2025-spring
+  title: ○○コラボ企画に出演
+  datetime: "2025-03-21T21:00"
+  category: 出演
+  organizers:
+    - { name: △△チャンネル, url: https://x.com/aaaa }
+  streams:
+    - { label: 公式配信, url: https://www.youtube.com/watch?v=zzzz }
+  description: コラボ企画に出演しました。（ダミー）

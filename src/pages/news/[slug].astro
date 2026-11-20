@@ -1,0 +1,140 @@
+---
+// NEWS 記事ページ：本文・日付・カテゴリと、前後の記事へのリンク
+// 読みやすさを最優先し、装飾やアニメーションは入れない
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getSortedNews, formatDate, isoDate } from '../../lib/news';
+
+export async function getStaticPaths() {
+	const posts = await getSortedNews();
+	return posts.map((post, i) => ({
+		params: { slug: post.id },
+		props: {
+			post,
+			// 一覧は新しい順なので、次（新しい）は i-1、前（古い）は i+1
+			newer: posts[i - 1],
+			older: posts[i + 1],
+		},
+	}));
+}
+
+const { post, newer, older } = Astro.props;
+const { Content } = await render(post);
+---
+
+<BaseLayout title={post.data.title} description={post.data.description} ogType="article">
+	<article class="page container">
+		<header class="article-header">
+			<p class="meta">
+				<time datetime={isoDate(post.data.date)}>{formatDate(post.data.date)}</time>
+				<span class="category">{post.data.category}</span>
+			</p>
+			<h1 class="title">{post.data.title}</h1>
+		</header>
+
+		<div class="body">
+			<Content />
+		</div>
+
+		<nav class="pager" aria-label="前後の記事">
+			{
+				older ? (
+					<a class="older" href={`/news/${older.id}/`}>
+						<span class="label">前の記事</span>
+						{older.data.title}
+					</a>
+				) : (
+					<span />
+				)
+			}
+			{
+				newer && (
+					<a class="newer" href={`/news/${newer.id}/`}>
+						<span class="label">次の記事</span>
+						{newer.data.title}
+					</a>
+				)
+			}
+		</nav>
+
+		<p class="back"><a href="/news/">NEWS 一覧へ戻る</a></p>
+	</article>
+</BaseLayout>
+
+<style>
+	.article-header {
+		margin-bottom: 40px;
+		padding-bottom: 24px;
+		border-bottom: 1px solid var(--color-line);
+	}
+
+	.meta {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		margin: 0 0 8px;
+		color: var(--color-muted);
+		font-size: 0.875rem;
+	}
+
+	.category {
+		padding: 0 10px;
+		border: 1px solid currentColor;
+		border-radius: 999px;
+		font-size: 0.75rem;
+	}
+
+	.title {
+		margin: 0;
+		font-size: clamp(1.5rem, 3.5vw, 2rem);
+		line-height: 1.5;
+	}
+
+	/* 本文：16px 以上・行間ゆったり・1行の文字数を抑える */
+	.body {
+		max-width: 38em;
+		font-size: 1.0625rem;
+		line-height: 2;
+	}
+
+	.body :global(h2) {
+		margin: 2.5em 0 0.75em;
+		font-size: 1.25rem;
+		line-height: 1.6;
+	}
+
+	.pager {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 16px;
+		margin-top: 64px;
+		padding-top: 24px;
+		border-top: 1px solid var(--color-line);
+	}
+
+	.pager a {
+		display: flex;
+		flex-direction: column;
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.pager a:hover {
+		text-decoration: underline;
+	}
+
+	.newer {
+		grid-column: 2;
+		text-align: right;
+	}
+
+	.label {
+		color: var(--color-muted);
+		font-size: 0.75rem;
+	}
+
+	.back {
+		margin-top: 40px;
+		text-align: center;
+	}
+</style>

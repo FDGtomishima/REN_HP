@@ -1,0 +1,251 @@
+---
+// 共通ヘッダー：サイト名とメニュー（スマホではハンバーガーメニュー）
+interface Props {
+	siteName: string;
+	/** true のとき背景を透過（HOME の背景イラストの上に重ねる） */
+	transparent?: boolean;
+}
+
+const { siteName, transparent = false } = Astro.props;
+
+const navItems = [
+	{ label: 'HOME', href: '/' },
+	{ label: 'ABOUT', href: '/about/' },
+	{ label: 'NEWS', href: '/news/' },
+	{ label: 'HISTORY', href: '/history/' },
+	{ label: 'ACHIEVEMENTS', href: '/achievements/' },
+	{ label: 'CONTACT', href: '/contact/' },
+];
+
+// 現在のページを判定（NEWS 記事ページでは NEWS を現在地にする）
+const path = Astro.url.pathname.replace(/\/?$/, '/');
+const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
+---
+
+<header class:list={['site-header', { 'is-transparent': transparent }]}>
+	<div class="inner">
+		<a class="logo" href="/">{siteName}</a>
+		<button
+			class="menu-button"
+			type="button"
+			aria-expanded="false"
+			aria-controls="site-nav"
+		>
+			<span class="visually-hidden">メニューを開く</span>
+			<span class="menu-icon" aria-hidden="true"></span>
+		</button>
+		<nav id="site-nav" class="nav" aria-label="メインメニュー">
+			<ul>
+				{
+					navItems.map((item) => (
+						<li>
+							<a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+								{item.label}
+							</a>
+						</li>
+					))
+				}
+			</ul>
+		</nav>
+	</div>
+</header>
+
+<script>
+	// ハンバーガーメニューの開閉
+	// View Transitions でページが切り替わるたびにヘッダーが差し替わるため、astro:page-load で毎回登録する
+	document.addEventListener('astro:page-load', () => {
+		const header = document.querySelector('.site-header');
+		const button = header?.querySelector<HTMLButtonElement>('.menu-button');
+		const label = button?.querySelector('.visually-hidden');
+		if (!header || !button || !label) return;
+
+		const setOpen = (open: boolean) => {
+			header.classList.toggle('is-open', open);
+			button.setAttribute('aria-expanded', String(open));
+			label.textContent = open ? 'メニューを閉じる' : 'メニューを開く';
+		};
+
+		button.addEventListener('click', () => {
+			setOpen(button.getAttribute('aria-expanded') !== 'true');
+		});
+		header.addEventListener('keydown', (e) => {
+			if ((e as KeyboardEvent).key === 'Escape') {
+				setOpen(false);
+				button.focus();
+			}
+		});
+	});
+</script>
+
+<style>
+	.site-header {
+		position: fixed;
+		inset: 0 0 auto;
+		z-index: 100;
+		height: var(--header-height);
+		background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+		border-bottom: 1px solid var(--color-line);
+		backdrop-filter: blur(8px);
+	}
+
+	.site-header.is-transparent {
+		background: transparent;
+		border-bottom-color: transparent;
+		backdrop-filter: none;
+		color: #fff;
+	}
+
+	.inner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		height: 100%;
+		max-width: 1200px;
+		margin-inline: auto;
+		padding-inline: var(--gutter);
+	}
+
+	.logo {
+		color: inherit;
+		font-size: 1.25rem;
+		font-weight: 700;
+		letter-spacing: 0.12em;
+		text-decoration: none;
+	}
+
+	.nav ul {
+		display: flex;
+		gap: 28px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.nav a {
+		color: inherit;
+		font-size: 0.8125rem;
+		letter-spacing: 0.1em;
+		text-decoration: none;
+	}
+
+	.nav a:hover,
+	.nav a[aria-current='page'] {
+		text-decoration: underline;
+		text-underline-offset: 6px;
+	}
+
+	.menu-button {
+		display: none;
+	}
+
+	/* スマホ：ハンバーガーメニュー */
+	@media (max-width: 767px) {
+		/* backdrop-filter があると中の position: fixed が画面全体に広がらないため、スマホでは外す */
+		.site-header {
+			backdrop-filter: none;
+			background: var(--color-bg);
+		}
+
+		.site-header.is-transparent {
+			background: transparent;
+		}
+
+		/* 開いたメニューの上にもロゴを表示する */
+		.logo {
+			position: relative;
+			z-index: 2;
+		}
+
+		.is-open .logo {
+			color: var(--color-text);
+		}
+
+		.menu-button {
+			display: grid;
+			place-items: center;
+			width: 44px;
+			height: 44px;
+			margin-right: -10px;
+			padding: 0;
+			border: 0;
+			background: none;
+			color: inherit;
+			cursor: pointer;
+			position: relative;
+			z-index: 2;
+		}
+
+		.menu-icon,
+		.menu-icon::before,
+		.menu-icon::after {
+			display: block;
+			width: 22px;
+			height: 2px;
+			background: currentColor;
+			transition: transform 0.25s, background-color 0.25s;
+		}
+
+		.menu-icon {
+			position: relative;
+		}
+
+		.menu-icon::before,
+		.menu-icon::after {
+			content: '';
+			position: absolute;
+			left: 0;
+		}
+
+		.menu-icon::before {
+			top: -7px;
+		}
+
+		.menu-icon::after {
+			top: 7px;
+		}
+
+		.is-open .menu-icon {
+			background: transparent;
+		}
+
+		.is-open .menu-icon::before {
+			transform: translateY(7px) rotate(45deg);
+		}
+
+		.is-open .menu-icon::after {
+			transform: translateY(-7px) rotate(-45deg);
+		}
+
+		.nav {
+			position: fixed;
+			inset: 0;
+			display: grid;
+			place-items: center;
+			background: var(--color-bg);
+			color: var(--color-text);
+			opacity: 0;
+			visibility: hidden;
+			transition: opacity 0.25s, visibility 0.25s;
+		}
+
+		.is-open .nav {
+			opacity: 1;
+			visibility: visible;
+		}
+
+		/* 開いたメニューの上ではアイコンを本文色にする */
+		.is-open .menu-button {
+			color: var(--color-text);
+		}
+
+		.nav ul {
+			flex-direction: column;
+			align-items: center;
+			gap: 24px;
+		}
+
+		.nav a {
+			font-size: 1.125rem;
+		}
+	}
+</style>

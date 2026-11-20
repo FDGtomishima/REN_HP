@@ -1,0 +1,44 @@
+---
+// 共通フッター：非公式表記、ライバーの SNS、プライバシーポリシー（CONTACT 内）へのリンク、コピーライト
+import SnsLinks from './SnsLinks.astro';
+import { getSite, getProfile } from '../lib/site';
+
+const site = await getSite();
+const profile = await getProfile();
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+	<div class="container inner">
+		<SnsLinks items={profile.sns} />
+		<a class="privacy" href="/contact/#privacy">プライバシーポリシー</a>
+		<p class="disclaimer">{site.disclaimer}</p>
+		<p class="copyright"><small>&copy; {year} {site.copyright}</small></p>
+	</div>
+</footer>
+
+<style>
+	.site-footer {
+		padding-block: 40px;
+		border-top: 1px solid var(--color-line);
+		font-size: 0.875rem;
+	}
+
+	.inner {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		text-align: center;
+	}
+
+	.privacy {
+		color: inherit;
+	}
+
+	.disclaimer,
+	.copyright {
+		margin: 0;
+		color: var(--color-muted);
+	}
+</style>

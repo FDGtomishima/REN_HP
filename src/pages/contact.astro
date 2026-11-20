@@ -1,0 +1,128 @@
+---
+// CONTACT：お問い合わせ（外部フォームへのリンク）・プライバシーポリシー・制作クレジット
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getSite } from '../lib/site';
+
+const site = await getSite();
+const credits = await getCollection('credits');
+---
+
+<BaseLayout title="CONTACT">
+	<div class="page container">
+		<h1 class="page-title">CONTACT</h1>
+
+		<section class="section" aria-labelledby="form-heading">
+			<h2 id="form-heading">お問い合わせ</h2>
+			<p>当サイトへのお問い合わせは、以下のフォームからお送りください。</p>
+			<p>
+				<a class="form-button" href={site.contactFormUrl} target="_blank" rel="noopener noreferrer">
+					お問い合わせフォームを開く（外部サイト）
+				</a>
+			</p>
+			<p class="note">
+				いただいた個人情報は返信のためにのみ使用し、フォームサービス（外部）に保存されます。詳しくは<a
+					href="#privacy">プライバシーポリシー</a
+				>をご覧ください。
+			</p>
+		</section>
+
+		<section id="privacy" class="section" aria-labelledby="privacy-heading">
+			<h2 id="privacy-heading">プライバシーポリシー</h2>
+			{/* TODO: 正式な文面に差し替える（ダミー） */}
+			<h3>取得する情報</h3>
+			<p>お問い合わせフォームでは、お名前・メールアドレス・お問い合わせ内容を取得します。</p>
+			<h3>利用目的</h3>
+			<p>取得した情報は、お問い合わせへの返信のためにのみ利用します。</p>
+			<h3>第三者への提供</h3>
+			<p>法令に基づく場合を除き、本人の同意なく第三者に提供しません。</p>
+			<h3>外部サービスの利用</h3>
+			<p>
+				お問い合わせフォームには外部サービスを利用しており、入力内容は同サービスに保存されます。配信の埋め込みは、再生ボタンを押したときにのみ
+				YouTube / Twitch のプレイヤーを読み込みます。
+			</p>
+		</section>
+
+		<section class="section" aria-labelledby="credits-heading">
+			<h2 id="credits-heading">CREDITS</h2>
+			{/* TODO: 必要ならエンドロール風の演出を付ける */}
+			<dl class="credits">
+				{
+					credits.map((c) => (
+						<div>
+							<dt>{c.data.role}</dt>
+							<dd>
+								{c.data.url ? (
+									<a href={c.data.url} target="_blank" rel="noopener noreferrer">
+										{c.data.name}
+									</a>
+								) : (
+									c.data.name
+								)}
+							</dd>
+						</div>
+					))
+				}
+			</dl>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.section + .section {
+		margin-top: 64px;
+	}
+
+	h2 {
+		margin: 0 0 16px;
+		font-size: 1.25rem;
+		letter-spacing: 0.08em;
+	}
+
+	h3 {
+		margin: 24px 0 4px;
+		font-size: 1rem;
+	}
+
+	h3 + p {
+		margin-top: 0;
+	}
+
+	.form-button {
+		display: inline-block;
+		padding: 12px 28px;
+		border-radius: 999px;
+		background: var(--color-accent);
+		color: #fff;
+		text-decoration: none;
+	}
+
+	.form-button:hover {
+		opacity: 0.85;
+	}
+
+	.note {
+		font-size: 0.875rem;
+		color: var(--color-muted);
+	}
+
+	.credits {
+		margin: 0;
+	}
+
+	.credits div {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 16px;
+		padding-block: 8px;
+		border-bottom: 1px solid var(--color-line);
+	}
+
+	dt {
+		color: var(--color-muted);
+	}
+
+	dd {
+		margin: 0;
+	}
+</style>

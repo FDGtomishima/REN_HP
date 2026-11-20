@@ -1,0 +1,438 @@
+---
+// ACHIEVEMENTS：実績カードの一覧と、クリックで開く <dialog> のモーダル
+// - データは src/data/achievements.yaml（新しい順に表示）
+// - /achievements/#ID で該当モーダルを直接開く（HISTORY のトロフィーからのリンク用）
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { formatYmd, formatDateTime, snsLabel } from '../lib/format';
+
+const achievements = (await getCollection('achievements')).sort((a, b) =>
+	b.data.datetime.localeCompare(a.data.datetime),
+);
+// 絞り込みタブ用のカテゴリ（登場順）
+const categories = [...new Set(achievements.map((a) => a.data.category))];
+---
+
+<BaseLayout title="ACHIEVEMENTS">
+	<div class="page container">
+		<h1 class="page-title">ACHIEVEMENTS</h1>
+
+		{
+			categories.length > 1 && (
+				<div class="filter" role="group" aria-label="カテゴリで絞り込む" data-achievement-filter>
+					<button type="button" data-filter="" aria-pressed="true">すべて</button>
+					{categories.map((c) => (
+						<button type="button" data-filter={c} aria-pressed="false">
+							{c}
+						</button>
+					))}
+				</div>
+			)
+		}
+
+		<ul class="cards">
+			{
+				achievements.map(({ data }, i) => (
+					<li data-category={data.category} style={`--i: ${i}`}>
+						<button type="button" class="card" data-open={data.id} aria-haspopup="dialog">
+							<span class="card-category">{data.category}</span>
+							<span class="card-title">{data.title}</span>
+							<time class="card-date" datetime={data.datetime}>
+								{formatYmd(data.datetime)}
+							</time>
+							<span class="card-organizers">{data.organizers.map((o) => o.name).join(' / ')}</span>
+							{data.result && <span class="card-result">{data.result}</span>}
+						</button>
+					</li>
+				))
+			}
+		</ul>
+
+		{
+			achievements.map(({ data }) => (
+				<dialog class="modal" data-dialog={data.id} aria-labelledby={`achievement-title-${data.id}`}>
+					<div class="modal-inner">
+						<button type="button" class="modal-close" data-close>
+							<span aria-hidden="true">×</span>
+							<span class="visually-hidden">閉じる</span>
+						</button>
+
+						<p class="modal-category">{data.category}</p>
+						<h2 id={`achievement-title-${data.id}`} class="modal-title">
+							{data.title}
+						</h2>
+
+						<dl class="modal-details">
+							<div>
+								<dt>日時</dt>
+								<dd>
+									<time datetime={data.datetime}>{formatDateTime(data.datetime)}</time>
+								</dd>
+							</div>
+							{data.result && (
+								<div>
+									<dt>結果</dt>
+									<dd class="result">{data.result}</dd>
+								</div>
+							)}
+							<div>
+								<dt>主催</dt>
+								<dd>
+									<ul class="people">
+										{data.organizers.map((o) => (
+											<li>
+												{o.name}
+												{o.url && (
+													<a href={o.url} target="_blank" rel="noopener noreferrer" class="sns">
+														{snsLabel(o.url)}
+														<span class="visually-hidden">（{o.name}）</span>
+													</a>
+												)}
+											</li>
+										))}
+									</ul>
+								</dd>
+							</div>
+							{data.team.length > 0 && (
+								<div>
+									<dt>チーム</dt>
+									<dd>
+										<ul class="people">
+											{data.team.map((m) => (
+												<li>
+													{m.name}
+													{m.url && (
+														<a href={m.url} target="_blank" rel="noopener noreferrer" class="sns">
+															{snsLabel(m.url)}
+															<span class="visually-hidden">（{m.name}）</span>
+														</a>
+													)}
+												</li>
+											))}
+										</ul>
+									</dd>
+								</div>
+							)}
+							{data.streams.length > 0 && (
+								<div>
+									<dt>配信</dt>
+									<dd>
+										<ul class="streams">
+											{data.streams.map((s) => (
+												<li>
+													<a href={s.url} target="_blank" rel="noopener noreferrer">
+														{s.label}
+													</a>
+												</li>
+											))}
+										</ul>
+									</dd>
+								</div>
+							)}
+						</dl>
+
+						{data.description && <p class="modal-description">{data.description}</p>}
+					</div>
+				</dialog>
+			))
+		}
+	</div>
+</BaseLayout>
+
+<script>
+	// カードの順次表示・絞り込み・モーダルの開閉
+	// View Transitions でページが差し替わるため、astro:page-load で毎回登録する
+	document.addEventListener('astro:page-load', () => {
+		const cards = document.querySelector('.cards');
+		if (!cards) return;
+
+		// --- カードの順次表示（画面に入ったら表示） ---
+		const items = cards.querySelectorAll<HTMLElement>('li');
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						entry.target.classList.add('is-visible');
+						observer.unobserve(entry.target);
+					}
+				});
+			},
+			{ rootMargin: '0px 0px -10% 0px' },
+		);
+		items.forEach((item) => {
+			item.classList.add('reveal');
+			observer.observe(item);
+		});
+		document.addEventListener('astro:before-swap', () => observer.disconnect(), { once: true });
+
+		// --- カテゴリの絞り込み ---
+		const filterButtons = document.querySelectorAll<HTMLButtonElement>('[data-achievement-filter] [data-filter]');
+		filterButtons.forEach((button) => {
+			button.addEventListener('click', () => {
+				const category = button.dataset.filter;
+				filterButtons.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+				items.forEach((item) => {
+					item.hidden = Boolean(category) && item.dataset.category !== category;
+				});
+			});
+		});
+
+		// --- モーダル ---
+		const dialogs = new Map<string, HTMLDialogElement>();
+		document.querySelectorAll<HTMLDialogElement>('dialog[data-dialog]').forEach((d) => {
+			dialogs.set(d.dataset.dialog!, d);
+		});
+
+		// URL の #ID を書き換える（View Transitions の履歴情報を消さないよう history.state を引き継ぐ）
+		const setHash = (id: string) => {
+			const url = id ? `${location.pathname}#${id}` : location.pathname;
+			history.replaceState(history.state, '', url);
+		};
+
+		const open = (id: string) => {
+			const dialog = dialogs.get(id);
+			if (!dialog || dialog.open) return;
+			dialog.showModal();
+			setHash(id);
+		};
+
+		cards.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((card) => {
+			card.addEventListener('click', () => open(card.dataset.open!));
+		});
+
+		// 閉じたら #ID を消す（close イベントが届かない環境もあるため、閉じる処理の中でも消す）
+		const close = (dialog: HTMLDialogElement) => {
+			dialog.close();
+			setHash('');
+		};
+
+		dialogs.forEach((dialog) => {
+			// Esc で閉じたとき
+			dialog.addEventListener('close', () => setHash(''));
+			dialog.querySelector('[data-close]')?.addEventListener('click', () => close(dialog));
+			// 背景（dialog 自身）のクリックで閉じる。中身は .modal-inner が覆っている
+			dialog.addEventListener('click', (e) => {
+				if (e.target === dialog) close(dialog);
+			});
+		});
+
+		// /achievements/#ID で開かれたとき
+		const fromHash = () => {
+			const id = decodeURIComponent(location.hash.slice(1));
+			if (id) open(id);
+		};
+		fromHash();
+		window.addEventListener('hashchange', fromHash);
+		document.addEventListener('astro:before-swap', () => window.removeEventListener('hashchange', fromHash), {
+			once: true,
+		});
+	});
+</script>
+
+<style>
+	.filter {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-bottom: 24px;
+	}
+
+	.filter button {
+		padding: 4px 16px;
+		border: 1px solid var(--color-line);
+		border-radius: 999px;
+		background: var(--color-surface);
+		color: inherit;
+		font: inherit;
+		font-size: 0.875rem;
+		cursor: pointer;
+	}
+
+	.filter button[aria-pressed='true'] {
+		border-color: var(--color-text);
+		background: var(--color-text);
+		color: var(--color-bg);
+	}
+
+	.cards {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+		gap: 20px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.cards li[hidden] {
+		display: none;
+	}
+
+	/* 順次表示（JS が動いたときだけ .reveal が付く） */
+	.cards li.reveal {
+		opacity: 0;
+		translate: 0 16px;
+		transition:
+			opacity 0.5s ease,
+			translate 0.5s ease;
+		transition-delay: calc(min(var(--i), 8) * 60ms);
+	}
+
+	.cards li.reveal.is-visible {
+		opacity: 1;
+		translate: 0 0;
+	}
+
+	.card {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 6px;
+		width: 100%;
+		height: 100%;
+		padding: 20px;
+		border: 1px solid var(--color-line);
+		border-radius: 10px;
+		background: var(--color-surface);
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+		transition: box-shadow 0.2s, translate 0.2s;
+	}
+
+	.card:hover,
+	.card:focus-visible {
+		box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
+		translate: 0 -2px;
+	}
+
+	.card-category {
+		padding: 0 10px;
+		border: 1px solid currentColor;
+		border-radius: 999px;
+		font-size: 0.75rem;
+	}
+
+	.card-title {
+		font-size: 1.0625rem;
+		font-weight: 700;
+		line-height: 1.5;
+	}
+
+	.card-date,
+	.card-organizers {
+		color: var(--color-muted);
+		font-size: 0.875rem;
+	}
+
+	.card-result {
+		margin-top: auto;
+		color: var(--color-accent);
+		font-weight: 700;
+	}
+
+	/* モーダル */
+	.modal {
+		width: min(640px, calc(100% - 32px));
+		max-height: calc(100% - 64px);
+		padding: 0;
+		border: 0;
+		border-radius: 12px;
+		background: var(--color-surface);
+		color: var(--color-text);
+	}
+
+	.modal::backdrop {
+		background: rgb(0 0 0 / 0.55);
+	}
+
+	.modal-inner {
+		position: relative;
+		padding: 32px 28px 28px;
+	}
+
+	.modal-close {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		width: 44px;
+		height: 44px;
+		border: 0;
+		background: none;
+		color: inherit;
+		font-size: 1.75rem;
+		line-height: 1;
+		cursor: pointer;
+	}
+
+	.modal-category {
+		margin: 0;
+		color: var(--color-muted);
+		font-size: 0.8125rem;
+	}
+
+	.modal-title {
+		margin: 4px 0 20px;
+		padding-right: 32px;
+		font-size: 1.375rem;
+		line-height: 1.5;
+	}
+
+	.modal-details {
+		margin: 0;
+	}
+
+	.modal-details > div {
+		display: grid;
+		grid-template-columns: 5em 1fr;
+		gap: 8px;
+		padding-block: 8px;
+		border-bottom: 1px solid var(--color-line);
+	}
+
+	dt {
+		color: var(--color-muted);
+	}
+
+	dd {
+		margin: 0;
+	}
+
+	.result {
+		font-weight: 700;
+		color: var(--color-accent);
+	}
+
+	.people,
+	.streams {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.people li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 4px 10px;
+	}
+
+	.sns {
+		font-size: 0.8125rem;
+	}
+
+	.streams {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 16px;
+	}
+
+	.modal-description {
+		margin: 20px 0 0;
+	}
+
+	/* モーダル表示中は後ろのページをスクロールさせない */
+	:global(html:has(dialog[open])) {
+		overflow: hidden;
+	}
+</style>

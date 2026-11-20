@@ -1,0 +1,140 @@
+---
+// 配信の埋め込み（クリックで読み込む方式）
+// 最初はサムネイルと再生ボタンだけを表示し、押したときにプレイヤーの iframe を読み込む。
+// - YouTube：プライバシー強化版の youtube-nocookie.com を使う
+// - Twitch：id が数字なら過去配信・ハイライト（video）、それ以外はクリップ（clip）として扱う。
+//           parent には表示中のドメイン（location.hostname）を渡すので、本番・デモ URL のどちらでも動く
+interface Props {
+	platform: 'youtube' | 'twitch';
+	id: string;
+	/** プレイヤーの title 属性（読み上げ用） */
+	title: string;
+}
+
+const { platform, id, title } = Astro.props;
+const isTwitchVideo = /^\d+$/.test(id);
+const thumbnail = platform === 'youtube' ? `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg` : undefined;
+const label = platform === 'youtube' ? 'YouTube' : isTwitchVideo ? 'Twitch' : 'Twitch クリップ';
+---
+
+<div
+	class:list={['stream-embed', `is-${platform}`]}
+	data-embed-platform={platform}
+	data-embed-id={id}
+	data-embed-kind={platform === 'twitch' ? (isTwitchVideo ? 'video' : 'clip') : undefined}
+	data-embed-title={title}
+>
+	<button type="button" class="play">
+		{thumbnail && <img src={thumbnail} alt="" loading="lazy" decoding="async" width="480" height="360" />}
+		<span class="play-icon" aria-hidden="true"></span>
+		<span class="label">{label}で再生<span class="visually-hidden">：{title}</span></span>
+	</button>
+</div>
+
+<script>
+	// 再生ボタンが押されたら iframe に置き換える（ページ全体で1回だけ登録するイベント委任）
+	document.addEventListener('click', (e) => {
+		const button = (e.target as HTMLElement).closest('.stream-embed .play');
+		const embed = button?.closest<HTMLElement>('.stream-embed');
+		if (!embed) return;
+
+		const { embedPlatform, embedId = '', embedKind, embedTitle = '' } = embed.dataset;
+		const id = encodeURIComponent(embedId);
+		const parent = encodeURIComponent(location.hostname);
+		let src = '';
+		if (embedPlatform === 'youtube') {
+			src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`;
+		} else if (embedKind === 'video') {
+			src = `https://player.twitch.tv/?video=${id}&parent=${parent}&autoplay=true`;
+		} else {
+			src = `https://clips.twitch.tv/embed?clip=${id}&parent=${parent}&autoplay=true`;
+		}
+
+		const iframe = document.createElement('iframe');
+		iframe.src = src;
+		iframe.title = embedTitle;
+		iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+		iframe.allowFullscreen = true;
+		iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+		embed.replaceChildren(iframe);
+		embed.classList.add('is-loaded');
+	});
+</script>
+
+<style>
+	.stream-embed {
+		position: relative;
+		aspect-ratio: 16 / 9;
+		border-radius: 6px;
+		overflow: hidden;
+		background: #1b1b1f;
+	}
+
+	.stream-embed.is-twitch {
+		background: #3a2a5c;
+	}
+
+	.play {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		width: 100%;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: #fff;
+		cursor: pointer;
+	}
+
+	.play img {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		opacity: 0.85;
+	}
+
+	.play-icon {
+		position: relative;
+		width: 56px;
+		height: 40px;
+		border-radius: 10px;
+		background: rgb(0 0 0 / 0.7);
+	}
+
+	.play-icon::after {
+		content: '';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		translate: -35% -50%;
+		border-style: solid;
+		border-width: 9px 0 9px 15px;
+		border-color: transparent transparent transparent #fff;
+	}
+
+	.play:hover .play-icon,
+	.play:focus-visible .play-icon {
+		background: #c4302b;
+	}
+
+	.label {
+		position: absolute;
+		left: 8px;
+		bottom: 6px;
+		padding: 0 8px;
+		border-radius: 4px;
+		background: rgb(0 0 0 / 0.6);
+		font-size: 0.75rem;
+	}
+
+	.stream-embed :global(iframe) {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		border: 0;
+	}
+</style>

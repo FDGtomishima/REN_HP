@@ -1,0 +1,579 @@
+---
+// HISTORY：デビュー日を起点に周年ごとに区切った年表
+// - 上部の周年タブで期間を切り替え（初期表示は現在の周年）
+// - 「縦」「横」のレイアウト切り替え（初期値は画面幅で決め、選んだ方をブラウザに記憶）
+//   横：縦スクロールで右から左へ流れる（GSAP ScrollTrigger）＋左に歩く人物
+//   縦：中央の線に沿ったタイムライン（スクロールでふわっと表示）
+// - 「視差効果を減らす」設定では初期値を縦にし、横を選んでも GSAP を使わず通常の横スクロールにする
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import StreamEmbed from '../components/StreamEmbed.astro';
+import { getProfile } from '../lib/site';
+import { groupByPeriod, todayInJapan } from '../lib/history';
+import { formatYmd } from '../lib/format';
+
+const profile = await getProfile();
+const entries = (await getCollection('history')).map((e) => e.data);
+
+// 実績へのリンク先が存在するかをビルド時に確認する（書き間違い防止）
+const achievementIds = new Set((await getCollection('achievements')).map((a) => a.data.id));
+for (const item of entries) {
+	if (item.achievement && !achievementIds.has(item.achievement)) {
+		throw new Error(`history.yaml「${item.title}」の achievement「${item.achievement}」が achievements.yaml にありません`);
+	}
+}
+
+const today = todayInJapan();
+const { periods, current } = groupByPeriod(profile.debut, entries, today);
+---
+
+<BaseLayout title="HISTORY">
+	<div class="history is-vertical" data-history>
+		<div class="page-head container">
+			<h1 class="page-title">HISTORY</h1>
+
+			<div class="controls">
+				<div class="period-tabs" role="tablist" aria-label="周年の選択">
+					{
+						periods.map((p) => (
+							<button
+								type="button"
+								role="tab"
+								id={`period-tab-${p.index}`}
+								aria-controls={`period-${p.index}`}
+								aria-selected={p.index === current ? 'true' : 'false'}
+								data-period-tab={p.index}
+								data-start={p.start}
+								data-end={p.end}
+							>
+								{p.label}
+							</button>
+						))
+					}
+				</div>
+
+				<div class="layout-switch" role="group" aria-label="レイアウトの切り替え">
+					<button type="button" data-layout="vertical" aria-pressed="true">縦</button>
+					<button type="button" data-layout="horizontal" aria-pressed="false">横</button>
+				</div>
+			</div>
+		</div>
+
+		{
+			periods.map((p) => (
+				<section
+					class="period"
+					id={`period-${p.index}`}
+					role="tabpanel"
+					aria-labelledby={`period-tab-${p.index}`}
+					data-period={p.index}
+					hidden={p.index !== current}
+				>
+					{/* 歩く人物（横レイアウトのみ表示）。TODO: 絵師の歩行スプライトシートに差し替え、CSS steps() で動かす */}
+					<div class="walker" aria-hidden="true">
+						<div class="walker-figure">
+							<span class="walker-head" />
+							<span class="walker-body" />
+						</div>
+					</div>
+
+					<ol class="track">
+						{p.items.map((item) => (
+							<li class="box">
+								<time class="box-date" datetime={item.date}>
+									{formatYmd(item.date)}
+								</time>
+								<h2 class="box-title">{item.title}</h2>
+								<p class="box-text">{item.text}</p>
+								{item.embeds.map((embed) => (
+									<StreamEmbed platform={embed.platform} id={embed.id} title={`${item.title}の配信`} />
+								))}
+								{item.achievement && (
+									<a class="trophy" href={`/achievements/#${item.achievement}`} title="関連する実績を見る">
+										<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+											<path
+												fill="currentColor"
+												d="M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V17h3v2H8v-2h3v-2.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3V3Zm0 4H6v1a2 2 0 0 0 1 1.7V7Zm10 0v2.7A2 2 0 0 0 18 8V7h-1Z"
+											/>
+										</svg>
+										<span class="visually-hidden">関連する実績を見る</span>
+									</a>
+								)}
+							</li>
+						))}
+						{(p.items.length === 0 || p.end > today) && (
+							<li class="box coming-soon">
+								<p>Coming Soon...</p>
+							</li>
+						)}
+					</ol>
+				</section>
+			))
+		}
+	</div>
+</BaseLayout>
+
+<script>
+	import { gsap } from 'gsap';
+	import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+	gsap.registerPlugin(ScrollTrigger);
+
+	type Layout = 'vertical' | 'horizontal';
+	const STORAGE_KEY = 'history-layout';
+
+	// ページ遷移のたびに作り直すもの
+	let ctx: gsap.Context | null = null;
+	let revealObserver: IntersectionObserver | null = null;
+	let walkTimer: number | undefined;
+
+	/** GSAP・監視をすべて破棄する（View Transitions のページ切り替え前、レイアウト・周年の切り替え時） */
+	function cleanup() {
+		ctx?.revert();
+		ctx = null;
+		revealObserver?.disconnect();
+		revealObserver = null;
+		window.clearTimeout(walkTimer);
+	}
+
+	function readStoredLayout(): Layout | null {
+		try {
+			const value = localStorage.getItem(STORAGE_KEY);
+			return value === 'vertical' || value === 'horizontal' ? value : null;
+		} catch {
+			return null;
+		}
+	}
+
+	function storeLayout(layout: Layout) {
+		try {
+			localStorage.setItem(STORAGE_KEY, layout);
+		} catch {
+			// 保存できない環境（プライベートモードなど）では記憶しないだけ
+		}
+	}
+
+	/** 今日（日本時間）を含む周年タブ */
+	function currentPeriodTab(tabs: HTMLButtonElement[]) {
+		const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date());
+		return tabs.find((t) => t.dataset.start! <= today && today < t.dataset.end!);
+	}
+
+	/** 縦レイアウト：画面に入ったボックスをふわっと表示 */
+	function setupVertical(section: HTMLElement) {
+		revealObserver = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						entry.target.classList.add('is-visible');
+						revealObserver?.unobserve(entry.target);
+					}
+				});
+			},
+			{ rootMargin: '0px 0px -10% 0px' },
+		);
+		section.querySelectorAll('.box').forEach((box) => {
+			box.classList.add('reveal');
+			revealObserver!.observe(box);
+		});
+	}
+
+	/** 横レイアウト：縦スクロールを横移動に変換し、人物を歩かせる */
+	function setupHorizontal(root: HTMLElement, section: HTMLElement) {
+		const track = section.querySelector<HTMLElement>('.track')!;
+		const walker = section.querySelector<HTMLElement>('.walker')!;
+
+		// スクロール中だけ歩き、止まると立ち止まる。戻る方向では左右反転
+		const walk = (direction: number) => {
+			walker.classList.add('is-walking');
+			walker.classList.toggle('is-reverse', direction < 0);
+			window.clearTimeout(walkTimer);
+			walkTimer = window.setTimeout(() => walker.classList.remove('is-walking'), 150);
+		};
+
+		ctx = gsap.context(() => {
+			const distance = () => Math.max(0, track.scrollWidth - section.clientWidth);
+
+			const move = gsap.to(track, {
+				x: () => -distance(),
+				ease: 'none',
+				scrollTrigger: {
+					trigger: section,
+					start: 'top top',
+					end: () => `+=${distance()}`,
+					pin: true,
+					scrub: 0.5,
+					invalidateOnRefresh: true,
+					onUpdate: (self) => walk(self.direction),
+				},
+			});
+
+			// 各ボックス：右から入ってくるときにフェードイン、人物のあたりでフェードアウト
+			track.querySelectorAll<HTMLElement>('.box').forEach((box) => {
+				gsap.fromTo(
+					box,
+					{ autoAlpha: 0, y: 24 },
+					{
+						autoAlpha: 1,
+						y: 0,
+						ease: 'none',
+						scrollTrigger: { trigger: box, containerAnimation: move, start: 'left 95%', end: 'left 70%', scrub: true },
+					},
+				);
+				gsap.to(box, {
+					autoAlpha: 0,
+					ease: 'none',
+					immediateRender: false,
+					scrollTrigger: { trigger: box, containerAnimation: move, start: 'right 38%', end: 'right 20%', scrub: true },
+				});
+			});
+		}, root);
+	}
+
+	document.addEventListener('astro:page-load', () => {
+		const root = document.querySelector<HTMLElement>('[data-history]');
+		if (!root) return;
+
+		const tabs = [...root.querySelectorAll<HTMLButtonElement>('[data-period-tab]')];
+		const sections = [...root.querySelectorAll<HTMLElement>('[data-period]')];
+		const layoutButtons = [...root.querySelectorAll<HTMLButtonElement>('[data-layout]')];
+		const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+		// 初期値：記憶した値 → 「視差効果を減らす」なら縦 → 画面幅（PC＝横、スマホ＝縦）
+		let layout: Layout =
+			readStoredLayout() ?? (reducedMotion ? 'vertical' : window.matchMedia('(min-width: 768px)').matches ? 'horizontal' : 'vertical');
+		let period = (currentPeriodTab(tabs) ?? tabs.find((t) => t.ariaSelected === 'true') ?? tabs[0])?.dataset.periodTab;
+
+		const apply = () => {
+			cleanup();
+
+			tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.periodTab === period)));
+			sections.forEach((s) => (s.hidden = s.dataset.period !== period));
+			layoutButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.layout === layout)));
+
+			// 横＋「視差効果を減らす」は GSAP を使わない通常の横スクロール（is-static）
+			const isStatic = layout === 'horizontal' && reducedMotion;
+			root.classList.toggle('is-vertical', layout === 'vertical');
+			root.classList.toggle('is-horizontal', layout === 'horizontal');
+			root.classList.toggle('is-static', isStatic);
+
+			const section = sections.find((s) => !s.hidden);
+			if (!section) return;
+			if (layout === 'vertical') setupVertical(section);
+			else if (!isStatic) setupHorizontal(root, section);
+			ScrollTrigger.refresh();
+		};
+
+		tabs.forEach((tab) =>
+			tab.addEventListener('click', () => {
+				period = tab.dataset.periodTab;
+				apply();
+			}),
+		);
+		layoutButtons.forEach((button) =>
+			button.addEventListener('click', () => {
+				layout = button.dataset.layout as Layout;
+				storeLayout(layout);
+				apply();
+			}),
+		);
+
+		apply();
+	});
+
+	// View Transitions でページが切り替わる前に、GSAP（pin の余白など）を元に戻す
+	document.addEventListener('astro:before-swap', cleanup);
+</script>
+
+<style>
+	.history {
+		padding-bottom: 80px;
+	}
+
+	.page-head {
+		padding-top: calc(var(--header-height) + 48px);
+	}
+
+	.controls {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: 16px;
+		margin-bottom: 40px;
+	}
+
+	.period-tabs,
+	.layout-switch {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.controls button {
+		padding: 4px 16px;
+		border: 1px solid var(--color-line);
+		border-radius: 999px;
+		background: var(--color-surface);
+		color: inherit;
+		font: inherit;
+		font-size: 0.875rem;
+		cursor: pointer;
+	}
+
+	.controls button[aria-selected='true'],
+	.controls button[aria-pressed='true'] {
+		border-color: var(--color-accent);
+		background: var(--color-accent);
+		color: #fff;
+	}
+
+	/* レイアウト別の display 指定より優先して、選ばれていない周年を隠す */
+	.period[hidden] {
+		display: none !important;
+	}
+
+	.track {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	/* ボックス共通 */
+	.box {
+		position: relative;
+		padding: 20px;
+		border: 1px solid var(--color-line);
+		border-radius: 10px;
+		background: var(--color-surface);
+	}
+
+	.box-date {
+		color: var(--color-muted);
+		font-size: 0.875rem;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.box-title {
+		margin: 2px 0 6px;
+		padding-right: 32px;
+		font-size: 1.125rem;
+		line-height: 1.5;
+	}
+
+	.box-text {
+		margin: 0 0 12px;
+		font-size: 0.9375rem;
+	}
+
+	.box :global(.stream-embed + .stream-embed) {
+		margin-top: 8px;
+	}
+
+	.trophy {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		display: grid;
+		place-items: center;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		background: #f4e3b0;
+		color: #8a6400;
+	}
+
+	.trophy:hover {
+		background: #ecd284;
+	}
+
+	.coming-soon {
+		display: grid;
+		place-items: center;
+		min-height: 140px;
+		border-style: dashed;
+		background: transparent;
+		color: var(--color-muted);
+		letter-spacing: 0.1em;
+	}
+
+	.coming-soon p {
+		margin: 0;
+	}
+
+	.walker {
+		display: none;
+	}
+
+	/* ---------- 縦レイアウト ---------- */
+	.is-vertical .track {
+		position: relative;
+		display: grid;
+		gap: 32px;
+		max-width: var(--content-width);
+		margin-inline: auto;
+		padding-inline: var(--gutter);
+	}
+
+	/* 中央の線 */
+	.is-vertical .track::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 50%;
+		width: 2px;
+		background: var(--color-line);
+		translate: -1px 0;
+	}
+
+	.is-vertical .box {
+		width: calc(50% - 32px);
+	}
+
+	.is-vertical .box:nth-child(odd) {
+		justify-self: start;
+	}
+
+	.is-vertical .box:nth-child(even) {
+		justify-self: end;
+	}
+
+	/* 線の上の点 */
+	.is-vertical .box::before {
+		content: '';
+		position: absolute;
+		top: 26px;
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: var(--color-accent);
+	}
+
+	.is-vertical .box:nth-child(odd)::before {
+		right: -39px;
+	}
+
+	.is-vertical .box:nth-child(even)::before {
+		left: -39px;
+	}
+
+	/* スクロールでふわっと表示（JS が動いたときだけ .reveal が付く） */
+	.is-vertical .box.reveal {
+		opacity: 0;
+		translate: 0 20px;
+		transition:
+			opacity 0.6s ease,
+			translate 0.6s ease;
+	}
+
+	.is-vertical .box.reveal.is-visible {
+		opacity: 1;
+		translate: 0 0;
+	}
+
+	@media (max-width: 767px) {
+		.is-vertical .track::before {
+			left: calc(var(--gutter) + 6px);
+		}
+
+		.is-vertical .box:nth-child(odd),
+		.is-vertical .box:nth-child(even) {
+			justify-self: stretch;
+			width: auto;
+			margin-left: 28px;
+		}
+
+		.is-vertical .box:nth-child(odd)::before,
+		.is-vertical .box:nth-child(even)::before {
+			left: -29px;
+			right: auto;
+		}
+	}
+
+	/* ---------- 横レイアウト ---------- */
+	.is-horizontal .period {
+		position: relative;
+		display: flex;
+		align-items: center;
+		height: 100svh;
+		overflow: hidden;
+	}
+
+	.is-horizontal .track {
+		display: flex;
+		align-items: center;
+		gap: 48px;
+		width: max-content;
+		/* 最初のボックスは人物の右から始め、最後のボックスも人物のところまで流れるよう余白を取る */
+		padding: var(--header-height) 60vw 0 32vw;
+	}
+
+	.is-horizontal .box {
+		flex: none;
+		width: min(340px, 70vw);
+	}
+
+	/* 歩く人物（仮の図形。スプライト素材が届いたら差し替える） */
+	.is-horizontal .walker {
+		position: absolute;
+		left: 10vw;
+		bottom: 14svh;
+		z-index: 1;
+		display: block;
+		pointer-events: none;
+	}
+
+	.walker-figure {
+		display: grid;
+		justify-items: center;
+		gap: 4px;
+		transition: scale 0.15s;
+	}
+
+	.walker-head {
+		width: 40px;
+		height: 40px;
+		border-radius: 50%;
+		background: var(--color-accent);
+	}
+
+	.walker-body {
+		width: 48px;
+		height: 90px;
+		border-radius: 24px 24px 8px 8px;
+		background: var(--color-accent);
+		opacity: 0.8;
+	}
+
+	.walker.is-reverse .walker-figure {
+		scale: -1 1;
+	}
+
+	.walker.is-walking .walker-figure {
+		animation: walk 0.4s steps(2) infinite;
+	}
+
+	@keyframes walk {
+		from {
+			translate: 0 0;
+		}
+		to {
+			translate: 0 -8px;
+		}
+	}
+
+	/* 横＋「視差効果を減らす」：通常の横スクロール。人物は出さない */
+	.is-static .period {
+		height: auto;
+		overflow-x: auto;
+		padding-bottom: 16px;
+	}
+
+	.is-static .track {
+		padding: 0 var(--gutter);
+	}
+
+	.is-static .walker {
+		display: none;
+	}
+</style>

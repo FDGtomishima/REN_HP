@@ -1,0 +1,4 @@
+# 制作クレジット（掲載前に本人の了承をもらう）
+- { name: ○○（絵師）, role: 立ち絵（初期衣装）, url: https://x.com/zzzz }
+- { name: △△（絵師）, role: 立ち絵（夏衣装）, url: https://x.com/wwww }
+- { name: サイト制作者, role: サイト制作 }

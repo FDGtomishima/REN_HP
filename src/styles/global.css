@@ -1,0 +1,94 @@
+/* サイト全体の基本スタイル（配色・フォントはデザイン確定までの仮） */
+
+:root {
+	--color-bg: #faf9f7;
+	--color-text: #1f1f1f;
+	--color-muted: #6b6b6b;
+	--color-line: #e2e0dc;
+	--color-accent: #2f5d8a;
+	--color-surface: #ffffff;
+
+	--font-base: 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif;
+	--header-height: 64px;
+	--content-width: 960px;
+	--gutter: 20px;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+	scroll-padding-top: var(--header-height);
+}
+
+body {
+	margin: 0;
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--color-bg);
+	color: var(--color-text);
+	font-family: var(--font-base);
+	line-height: 1.8;
+}
+
+main {
+	flex: 1;
+}
+
+img,
+video {
+	max-width: 100%;
+	height: auto;
+	display: block;
+}
+
+a {
+	color: var(--color-accent);
+}
+
+/* 本文幅のコンテナ */
+.container {
+	width: 100%;
+	max-width: var(--content-width);
+	margin-inline: auto;
+	padding-inline: var(--gutter);
+}
+
+/* 通常ページの上下余白（固定ヘッダー分を含む） */
+.page {
+	padding-top: calc(var(--header-height) + 48px);
+	padding-bottom: 80px;
+}
+
+.page-title {
+	margin: 0 0 32px;
+	font-size: clamp(1.75rem, 4vw, 2.5rem);
+	letter-spacing: 0.08em;
+}
+
+/* スクリーンリーダー向けにだけ表示 */
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+/* OS の「視差効果を減らす」設定ではアニメーションを止める */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
